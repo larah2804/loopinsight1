@@ -127,6 +127,53 @@ export class UvaPadova_T1DMS
 
         const params = this.getParameterValues()
 
+        function Klassifizierung(SI: number, parameter: number) {
+            let stuetzstellen: number[][];
+
+            switch(SI) {
+                case 0: // Klasse mit konstanter Insulinsensivität
+                    stuetzstellen = [[0, parameter], [4, parameter], [11, parameter], [17, parameter]];
+                    break;
+                case 7: // Klasse mit höchster Auftrittswahrscheinlichkeit von 30%
+                    stuetzstellen = [[0, parameter], [4, 0.75*parameter], [11, 0.75*parameter], [17, parameter]];
+                    break;
+                default:
+                    stuetzstellen = [];
+            }
+            return stuetzstellen;
+        }
+
+        function Interpolation(stuetzstellen: number[][], time: number) {
+            let y = 0;
+
+            for (let i = 0; i < stuetzstellen.length; i++) {
+                if (stuetzstellen[i][0] <= time) {
+                    y = stuetzstellen[i][1];
+                } else {
+                    break;
+                }
+            }
+            return y;
+        }
+
+        function kp1Berechnung(time: number, increase: number, start: number){
+            let y = 0;
+            let m = 0;
+            let c = 0;
+            if (time >= 3 && time <= 7) {
+                m = increase/4;
+                c = start - 3*m;
+                y = m * time + c;
+            } else if(time > 7 && time <= 9) {
+                m = -increase/2;
+                c = start - 9*m;
+                y = m * time + c; 
+            } else {
+                y = start;
+            }
+            return y;
+        }
+
         // inputs
         /** meal ingestion in mg/min */
         const M = (u.carbs || 0) * 1000
@@ -151,9 +198,13 @@ export class UvaPadova_T1DMS
             risk = 10 * Math.pow(f_risk(G), 2)
         }
 
+        let time = new Date();
+        let t = time.getHours();
+        let Vmx = Interpolation(Klassifizierung(params.SI, params.Vmx),t);
+        
         /** insulin-dependent glucose utilization in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A10)
-        const Uid = (params.Vm0 + params.Vmx * x.X * (1 + params.rgamma * risk))
+        const Uid = (params.Vm0 + Vmx * x.X * (1 + params.rgamma * risk))
             * x.Gt / (params.Km0 + x.Gt)
 
         /** insulin-independent glucose utilization in mg/kg/min */
@@ -170,8 +221,11 @@ export class UvaPadova_T1DMS
 
         /** endogenous glucose production in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A5), [Dalla Man, IEEE TBME, 2007] (10) (Ipo = 0)
-        const EGP = Math.max(0, params.kp1 - params.kp2 * x.Gp
-            - params.kp3 * x.XL + params.kxi * x.XH)
+        let kp3 = Interpolation(Klassifizierung(params.SI, params.kp3),t);
+        let kp1 = kp1Berechnung(t, params.in, params.kp1);
+
+        const EGP = Math.max(0, kp1 - params.kp2 * x.Gp
+            - kp3 * x.XL + params.kxi * x.XH)  
 
         /** renal glucose excretion in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A14), [Dalla Man, IEEE TBME, 2007] (27)
@@ -208,7 +262,7 @@ export class UvaPadova_T1DMS
         } as State
 
         // Gp [Dalla Man, JDST, 2014] (A1), [Dalla Man, IEEE TBME, 2007] (1)
-        dx_dt.Gp = EGP + Ra - Uii - E - params.k1 * x.Gp + params.k2 * x.Gt
+        dx_dt.Gp = EGP + Ra - Uii - E - params.k1 * x.Gp + params.k2 * x.Gt 
 
         // Gt [Dalla Man, JDST, 2014] (A1), [Dalla Man, IEEE TBME, 2007] (1)
         dx_dt.Gt = -Uid + params.k1 * x.Gp - params.k2 * x.Gt
@@ -349,6 +403,8 @@ export const parameterDescription = {
     "ka2":      { unit: "1/min",     default: 0.0182,},	// [Dalla Man, JDST, 2007]
     "kd":       { unit: "1/min",     default: 0.0164,},	// [Dalla Man, JDST, 2007]
     "Td":       { unit: "min",     default: 10,	},	// [Dalla Man, JDST, 2007]
+    "SI":       { unit: "1",      default: 7,}, // Insulinsensivität(Klasse 0-7)
+    "in":       { unit: "1",      default: 1.72,}, // EPG Steigung während 3.00 und 7.00
     /** 
      * parameter for alpha-cell responsivity to glucose level
      * TODO: find reliable value in the literature
