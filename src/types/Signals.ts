@@ -120,6 +120,11 @@ export const PatientOutputDescription = {
     Gp: {unit: 'mg/dl'},
     /** tissue glucose in mg/dl */
     Gt: {unit: 'mg/dl'},
+    EGP: {},
+    kp1: {},
+    Vmx: {},
+    kir: {},
+    Uid: {},
 }
 
 /**
@@ -130,6 +135,11 @@ export declare type PatientOutput = {
     Gp: number,
     /** tissue glucose in mg/dl */
     Gt?: number,
+    EGP?: number,
+    kp1?: number,
+    Vmx?: number,
+    kir?: number,
+    Uid?: number,
 }
 
 /** 
