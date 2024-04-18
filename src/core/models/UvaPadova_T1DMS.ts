@@ -69,6 +69,11 @@ export class UvaPadova_T1DMS
      * neither a state variable nor a parameter, but part of the steady state.
      */
     Ib: number = NaN
+    EGP: number = NaN
+    kp1: number = NaN
+    Vmx: number = NaN
+    kir: number = NaN
+    Uid: number = NaN
 
 
     getModelInfo(): ModuleProfile {
@@ -80,7 +85,7 @@ export class UvaPadova_T1DMS
     }
 
     getOutputList(): Array<keyof PatientOutput> {
-        return ["Gp"]
+        return ["Gp", "EGP", "kp1", "Vmx", "kir", "Uid"]
     }
 
     getStateDescription() {
@@ -134,6 +139,9 @@ export class UvaPadova_T1DMS
                 case 0: // Klasse mit konstanter Insulinsensivität
                     stuetzstellen = [[0, parameter], [4, parameter], [11, parameter], [17, parameter]];
                     break;
+                case 2: // Auftrittswahrscheinlichkeit von 5 %
+                    stuetzstellen = [[0, 0.75*parameter], [4, parameter], [11, parameter], [17, 0.75*parameter]]
+                    break;
                 case 7: // Klasse mit höchster Auftrittswahrscheinlichkeit von 30%
                     stuetzstellen = [[0, parameter], [4, 0.75*parameter], [11, 0.75*parameter], [17, parameter]];
                     break;
@@ -173,6 +181,23 @@ export class UvaPadova_T1DMS
             }
             return y;
         }
+        function kirBerechnung(time: number, increase: number, start: number){
+            let y = 0;
+            let m = 0;
+            let c = 0;
+            if (time >= 3 && time <= 7) {
+                m = -increase/4;
+                c = start - 3*m;
+                y = m * time + c;
+            } else if(time > 7 && time <= 9) {
+                m = increase/2;
+                c = start - 9*m;
+                y = m * time + c; 
+            } else {
+                y = start;
+            }
+            return y;
+        }
 
         // inputs
         /** meal ingestion in mg/min */
@@ -198,14 +223,21 @@ export class UvaPadova_T1DMS
             risk = 10 * Math.pow(f_risk(G), 2)
         }
 
-        let time = new Date();
-        let t = time.getHours();
+        
+        let h = _t.getHours();
+        let m = _t.getMinutes()/60
+        let t = h + m
         let Vmx = Interpolation(Klassifizierung(params.SI, params.Vmx),t);
+        this.Vmx = Vmx
         
         /** insulin-dependent glucose utilization in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A10)
-        const Uid = (params.Vm0 + Vmx * x.X * (1 + params.rgamma * risk))
-            * x.Gt / (params.Km0 + x.Gt)
+        let kir = kirBerechnung(t, params.inU, params.kir);
+        this.kir = kir
+
+        const Uid = (kir * (params.Vm0 + Vmx * x.X * (1 + params.rgamma * risk))
+            * x.Gt) / (params.Km0 + x.Gt)
+        this.Uid = Uid
 
         /** insulin-independent glucose utilization in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A9), [Dalla Man, IEEE TBME, 2007] (14)
@@ -222,10 +254,12 @@ export class UvaPadova_T1DMS
         /** endogenous glucose production in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A5), [Dalla Man, IEEE TBME, 2007] (10) (Ipo = 0)
         let kp3 = Interpolation(Klassifizierung(params.SI, params.kp3),t);
-        let kp1 = kp1Berechnung(t, params.in, params.kp1);
+        let kp1 = kp1Berechnung(t, params.inE, params.kp1);
+        this.kp1 = kp1
 
         const EGP = Math.max(0, kp1 - params.kp2 * x.Gp
             - kp3 * x.XL + params.kxi * x.XH)  
+        this.EGP = EGP
 
         /** renal glucose excretion in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A14), [Dalla Man, IEEE TBME, 2007] (27)
@@ -352,6 +386,11 @@ export class UvaPadova_T1DMS
         return {
             Gp: x.Gp / params.VG,
             Gt: x.Gs / params.VG,
+            EGP: this.EGP,
+            kp1: this.kp1,
+            Vmx: this.Vmx,
+            kir: this.kir,
+            Uid: this.Uid,
         }
     }
 
@@ -389,7 +428,7 @@ export const parameterDescription = {
     "f":        { unit: "1",     default: 0.90,  },	// [Dalla Man, IEEE TBME, 2007]
     "kp1":      { unit: "mg/kg/min",     default: 2.7,   },  // [Dalla Man, IEEE TBME, 2007]
     "kp2":      { unit: "1/min",     default: 0.0021,},	// [Dalla Man, IEEE TBME, 2007]
-    "kp3":      { unit: "mg/kg per pmol/l",     default: 0.009,	},	// [Dalla Man, IEEE TBME, 2007]
+    "kp3":      { unit: "mg/kg/min per pmol/l",     default: 0.009,	},	// [Dalla Man, IEEE TBME, 2007]
     "kp4":      { unit: "mg/kg/min per pmol/kg",     default: 0.0618,},	// [Dalla Man, IEEE TBME, 2007]
     "ki":       { unit: "1/min",     default: 0.0079,},	// [Dalla Man, IEEE TBME, 2007]
     "Fcns":     { unit: "mg/kg/min",     default: 1,     },  // [Dalla Man, IEEE TBME, 2007]
@@ -404,7 +443,9 @@ export const parameterDescription = {
     "kd":       { unit: "1/min",     default: 0.0164,},	// [Dalla Man, JDST, 2007]
     "Td":       { unit: "min",     default: 10,	},	// [Dalla Man, JDST, 2007]
     "SI":       { unit: "1",      default: 7,}, // Insulinsensivität(Klasse 0-7)
-    "in":       { unit: "1",      default: 1.72,}, // EPG Steigung während 3.00 und 7.00
+    "inE":      { unit: "1",      default: 1.5,}, // EPG Steigung während 3.00 und 7.00
+    "kir":      { unit: "1",      default: 1,}, 
+    "inU":      { unit: "1",      default: 0.19,}, // EPG Senkung während 3.00 und 7.00
     /** 
      * parameter for alpha-cell responsivity to glucose level
      * TODO: find reliable value in the literature
