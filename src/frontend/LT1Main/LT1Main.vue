@@ -16,6 +16,7 @@ import MealTable from './MealTable.vue'
 import ExerciseTable from './ExerciseTable.vue'
 import ChartGlucose from './ChartGlucose.vue'
 import ChartInsulinCarbs from './ChartInsulinCarbs.vue'
+import ChartSignals from './ChartSignals.vue'
 import ChartControllerOutput from './ChartControllerOutput.vue'
 import SimulationOptionsConfig from './SimulationOptionsConfig.vue'
 import ChartAGP from './ChartAGP.vue'
@@ -65,6 +66,7 @@ export default defineComponent({
         ChartInsulinCarbs,
         ChartControllerOutput,
         ChartAGP,
+        ChartSignals,
     },
 
     data() {
@@ -214,6 +216,7 @@ export default defineComponent({
         <div class="box lt1-results">
             <h2>{{ $t("results") }}</h2>
             <ChartGlucose ref="chartGlucose" />
+            <ChartSignals ref="chartSignals" />
             <ChartInsulinCarbs ref="chartInsulinCarbs" @selectLog="controllerDataHover" />
             <ChartControllerOutput ref="chartControllerOutput" />
             <ChartAGP ref="chartAGP" />
