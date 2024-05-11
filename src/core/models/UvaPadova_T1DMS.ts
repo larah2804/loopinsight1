@@ -12,6 +12,7 @@ import {
     TypedPatientState, PatientInput, PatientOutput
 } from '../../types/Patient.js'
 import AbstractODEPatient, { createPatientFromODE } from '../AbstractODEPatient.js'
+import {Interpolation, kirBerechnung, kp1Berechnung, Klasse} from '../../frontend/util/Funktionen.js'
 
 export const profile: ModuleProfile = {
     type: "patient",
@@ -74,10 +75,15 @@ export class UvaPadova_T1DMS
     Vmx: number = NaN
     kir: number = NaN
     Uid: number = NaN
+    kp3: number = NaN
 
 
     getModelInfo(): ModuleProfile {
         return profile
+    }
+    
+    updateVmx(array: any) {
+        this.Vmx = array
     }
 
     getInputList(): Array<keyof PatientInput> {
@@ -85,11 +91,15 @@ export class UvaPadova_T1DMS
     }
 
     getOutputList(): Array<keyof PatientOutput> {
-        return ["Gp", "EGP", "kp1", "Vmx", "kir", "Uid"]
+        return ["Gp", "EGP", "kp1", "Vmx", "kir", "Uid", "kp3"]
     }
 
     getStateDescription() {
         return stateDescription
+    }
+
+    getTest() {
+        return 
     }
 
     getParameterDescription() {
@@ -131,74 +141,7 @@ export class UvaPadova_T1DMS
     computeDerivatives(_t: Date, x: State, u: PatientInput): State {
 
         const params = this.getParameterValues()
-
-        function Klassifizierung(SI: number, parameter: number) {
-            let stuetzstellen: number[][];
-
-            switch(SI) {
-                case 0: // Klasse mit konstanter Insulinsensivität
-                    stuetzstellen = [[0, parameter], [4, parameter], [11, parameter], [17, parameter]];
-                    break;
-                case 2: // Auftrittswahrscheinlichkeit von 5 %
-                    stuetzstellen = [[0, 0.75*parameter], [4, parameter], [11, parameter], [17, 0.75*parameter]]
-                    break;
-                case 7: // Klasse mit höchster Auftrittswahrscheinlichkeit von 30%
-                    stuetzstellen = [[0, parameter], [4, 0.75*parameter], [11, 0.75*parameter], [17, parameter]];
-                    break;
-                default:
-                    stuetzstellen = [];
-            }
-            return stuetzstellen;
-        }
-
-        function Interpolation(stuetzstellen: number[][], time: number) {
-            let y = 0;
-
-            for (let i = 0; i < stuetzstellen.length; i++) {
-                if (stuetzstellen[i][0] <= time) {
-                    y = stuetzstellen[i][1];
-                } else {
-                    break;
-                }
-            }
-            return y;
-        }
-
-        function kp1Berechnung(time: number, increase: number, start: number){
-            let y = 0;
-            let m = 0;
-            let c = 0;
-            if (time >= 3 && time <= 7) {
-                m = increase/4;
-                c = start - 3*m;
-                y = m * time + c;
-            } else if(time > 7 && time <= 9) {
-                m = -increase/2;
-                c = start - 9*m;
-                y = m * time + c; 
-            } else {
-                y = start;
-            }
-            return y;
-        }
-        function kirBerechnung(time: number, increase: number, start: number){
-            let y = 0;
-            let m = 0;
-            let c = 0;
-            if (time >= 3 && time <= 7) {
-                m = -increase/4;
-                c = start - 3*m;
-                y = m * time + c;
-            } else if(time > 7 && time <= 9) {
-                m = increase/2;
-                c = start - 9*m;
-                y = m * time + c; 
-            } else {
-                y = start;
-            }
-            return y;
-        }
-
+        
         // inputs
         /** meal ingestion in mg/min */
         const M = (u.carbs || 0) * 1000
@@ -227,7 +170,9 @@ export class UvaPadova_T1DMS
         let h = _t.getHours();
         let m = _t.getMinutes()/60
         let t = h + m
-        let Vmx = Interpolation(Klassifizierung(params.SI, params.Vmx),t);
+        //let Vmx = Interpolation(Klasse(params.SI, 0.047, params.EB, params.ZB, params.DB, params.VB),t);
+        //this.Vmx = Vmx
+        let Vmx = Interpolation([[0, 0.047], [4, 0.047], [11, 0.047], [17, 0.047]],t)
         this.Vmx = Vmx
         
         /** insulin-dependent glucose utilization in mg/kg/min */
@@ -253,7 +198,8 @@ export class UvaPadova_T1DMS
 
         /** endogenous glucose production in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A5), [Dalla Man, IEEE TBME, 2007] (10) (Ipo = 0)
-        let kp3 = Interpolation(Klassifizierung(params.SI, params.kp3),t);
+        let kp3 = Interpolation(Klasse(params.SI, params.kp3, params.EB, params.ZB, params.DB, params.VB),t);
+        this.kp3 = kp3
         let kp1 = kp1Berechnung(t, params.inE, params.kp1);
         this.kp1 = kp1
 
@@ -391,6 +337,7 @@ export class UvaPadova_T1DMS
             Vmx: this.Vmx,
             kir: this.kir,
             Uid: this.Uid,
+            kp3: this.kp3,
         }
     }
 
@@ -433,7 +380,7 @@ export const parameterDescription = {
     "ki":       { unit: "1/min",     default: 0.0079,},	// [Dalla Man, IEEE TBME, 2007]
     "Fcns":     { unit: "mg/kg/min",     default: 1,     },  // [Dalla Man, IEEE TBME, 2007]
     "Vm0":      { unit: "mg/kg/min",     default: 2.5,	},  // [Dalla Man, IEEE TBME, 2007]
-    "Vmx":      { unit: "mg/kg/min per pmol/l",     default: 0.047,	},	// [Dalla Man, IEEE TBME, 2007]
+    "Vmx":      { unit: "mg/kg/min per pmol/l",     default: [[0, 0.047], [4, 0.047], [11, 0.047], [17, 0.047]],	},	// [Dalla Man, IEEE TBME, 2007]
     "Km0":      { unit: "mg/kg",     default: 225.59,},	// [Dalla Man, IEEE TBME, 2007]
     "p2u":      { unit: "1/min",     default: 0.0331,},	// [Dalla Man, IEEE TBME, 2007]
     "ke1":      { unit: "1/min",     default: 0.0005,},	// [Dalla Man, IEEE TBME, 2007]
@@ -446,6 +393,10 @@ export const parameterDescription = {
     "inE":      { unit: "1",      default: 1.5,}, // EPG Steigung während 3.00 und 7.00
     "kir":      { unit: "1",      default: 1,}, 
     "inU":      { unit: "1",      default: 0.19,}, // EPG Senkung während 3.00 und 7.00
+    "EB":       { unit: "1",     default: 0,},
+    "ZB":       { unit: "1",     default: 0,},
+    "DB":       { unit: "1",     default: 0,},
+    "VB":       { unit: "1",     default: 0,},
     /** 
      * parameter for alpha-cell responsivity to glucose level
      * TODO: find reliable value in the literature
