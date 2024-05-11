@@ -10,6 +10,9 @@ import { defineComponent, toRaw } from 'vue'
 import { defaults } from 'chart.js'
 import ControllerSelection from './ControllerSelection.vue'
 import VirtualPatientSelection from './VirtualPatientSelection.vue'
+import Test from './Test.vue'
+import S from './S.vue'
+import Vmx from './Vmx.vue'
 import SensorSelection from './SensorSelection.vue'
 import ActuatorSelection from './ActuatorSelection.vue'
 import MealTable from './MealTable.vue'
@@ -17,6 +20,7 @@ import ExerciseTable from './ExerciseTable.vue'
 import ChartGlucose from './ChartGlucose.vue'
 import ChartInsulinCarbs from './ChartInsulinCarbs.vue'
 import ChartSignals from './ChartSignals.vue'
+import ChartSignals1 from './ChartSignals1.vue'
 import ChartControllerOutput from './ChartControllerOutput.vue'
 import SimulationOptionsConfig from './SimulationOptionsConfig.vue'
 import ChartAGP from './ChartAGP.vue'
@@ -28,6 +32,7 @@ import Actuator from '../../types/Actuator.js'
 import Exercise from '../../types/Exercise.js'
 import Meal from '../../types/Meal.js'
 import Simulator, {SimulatorOptions} from '../../core/Simulator.js'
+import {UvaPadova_T1DMS} from '../../core/models/UvaPadova_T1DMS.js';
 
 
 // prepare simulator
@@ -67,6 +72,11 @@ export default defineComponent({
         ChartControllerOutput,
         ChartAGP,
         ChartSignals,
+        ChartSignals1,
+        Test,
+        S,
+        Vmx,
+        UvaPadova_T1DMS,
     },
 
     data() {
@@ -80,8 +90,20 @@ export default defineComponent({
             exerciseUnits: [] as Exercise[],
             options: {} as SimulatorOptions,
             myCharts: [],
+            daten: [],
+            UvaPadova_T1DMS: new UvaPadova_T1DMS(),
+            parameterDescription: {
+            // Initialisieren Sie es mit dem tatsächlichen Objekt, das die Parameter beschreibt
+            Gpeq: { unit: "mg/dl", default: 100, step: 10 },
+            BW: { unit: "kg", default: 75, step: 5 },
+            // weitere Parameter...
+            Vmx: { unit: "mg/kg/min per pmol/l", default: [[0, 0.047], [4, 0.047], [11, 0.047], [17, 0.047]] },
+            // weitere Parameter...
+        }
         }
     },
+
+    
 
     methods: {
         run(): void {
@@ -116,6 +138,9 @@ export default defineComponent({
         getMeals(): Meal[] {
             return toRaw(this.meals)
         },
+        updateData(newData: any) {
+            this.daten = newData;
+        },
         getExerciseUnits(): Exercise[] {
             return toRaw(this.exerciseUnits)
         },
@@ -140,6 +165,12 @@ export default defineComponent({
                     this.patientProfile = profile
                 }
             }
+        },
+        profileUpdated(parameterValues: any): void {
+            if (typeof parameterValues !== "undefined") {
+                this.parameterDescription.Vmx = parameterValues 
+            }
+            this.UvaPadova_T1DMS.updateVmx(parameterValues);
         },
         sensorChanged(newSensor: Sensor): void {
             if (typeof newSensor !== "undefined") {
@@ -199,6 +230,7 @@ export default defineComponent({
             <SensorSelection @valueChanged="sensorChanged" />
             <ActuatorSelection @valueChanged="actuatorChanged" />
             <VirtualPatientSelection @patientChanged="patientChanged" />
+            <Test @profileUpdated="profileUpdated" @datasaved="updateData" />
             <MealTable v-if='options.t0' :t0="options.t0" @mealsChanged="mealsChanged" ref="meals" />
             <ExerciseTable v-if='options.t0' :t0="options.t0" @exercisesChanged="exercisesChanged" />
             <SimulationOptionsConfig @valueChanged="optionsChanged" ref="options" />
@@ -217,6 +249,9 @@ export default defineComponent({
             <h2>{{ $t("results") }}</h2>
             <ChartGlucose ref="chartGlucose" />
             <ChartSignals ref="chartSignals" />
+            <ChartSignals1 ref="chartSignals1" />
+            <S ref="S" />
+            <Vmx :daten="daten" />
             <ChartInsulinCarbs ref="chartInsulinCarbs" @selectLog="controllerDataHover" />
             <ChartControllerOutput ref="chartControllerOutput" />
             <ChartAGP ref="chartAGP" />

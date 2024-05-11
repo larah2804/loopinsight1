@@ -11,6 +11,8 @@ import ParameterConfigBoolean from './ParameterConfigBoolean.vue'
 import ParameterConfigDate from './ParameterConfigDate.vue'
 import ParameterConfigNumber from './ParameterConfigNumber.vue'
 import ParameterConfigArray from './ParameterConfigArray.vue'
+import DailyProfile from '../../common/DailyProfile.js';
+import ParameterConfigDailyProfile from './ParameterConfigDailyProfile.vue'
 import ParametricModule, {
     ParameterValues,
     ParameterDescriptions,
@@ -29,6 +31,7 @@ export default defineComponent({
         ParameterConfigDate,
         ParameterConfigNumber,
         ParameterConfigArray,
+        ParameterConfigDailyProfile,
     },
 
     props: {
@@ -146,6 +149,9 @@ export default defineComponent({
             if (Object.prototype.toString.call(value) === "[object Date]")
                 return "ParameterConfigDate"
             if (Array.isArray(value)) {
+                if (value.every(entry => Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'number' && typeof entry[1] === 'number')) {
+                    return "ParameterConfigDailyProfile";
+                }
                 return "ParameterConfigArray"
             }
             return "ParameterConfigObject"

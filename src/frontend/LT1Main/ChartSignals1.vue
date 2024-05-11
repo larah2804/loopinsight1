@@ -15,7 +15,7 @@ import { SimulationResult } from '../../types/SimulationResult.js'
 import AccordionBox from './AccordionBox.vue'
 import { ControllerInternals } from '../../types/Controller.js'
 
-let chartSignals: Chart
+let chartSignals1: Chart
 
 export default defineComponent({
     emits: ["selectLog"],
@@ -26,47 +26,38 @@ export default defineComponent({
     
     mounted() {
         const component = this
-        const id = "signals"
+        const id = "signals1"
         const canvas = document.getElementById(id) as HTMLCanvasElement
-        chartSignals = new Chart(canvas.getContext('2d')!, {
+        chartSignals1 = new Chart(canvas.getContext('2d')!, {
             data: {
                 datasets: [
                     <ChartDatasetCustomTypesPerDataset>{
                         type: "line",
                         data: [],
-                        yAxisID: 'ye',
-                        label: "Vmx",
-                        borderColor: colors['THUBlue'],
+                        yAxisID: 'y',
+                        label: "EGP",
+                        borderColor: colors['THURed'],
                         spanGaps: true,
                         stepped: "before",
-                    },        
+                    },    
                     <ChartDatasetCustomTypesPerDataset>{
                         type: "line",
                         data: [],
-                        yAxisID: 'ys',
-                        label: "kir",
+                        yAxisID: 'yx',
+                        label: "kp1",
                         borderColor: colors['THUGreen'],
                         spanGaps: true,
                         stepped: "before",
-                    },        
+                    },  
                     <ChartDatasetCustomTypesPerDataset>{
                         type: "line",
                         data: [],
-                        yAxisID: 'yu',
-                        label: "Uid",
-                        borderColor: colors['THURed'],
+                        yAxisID: 'yk',
+                        label: "kp3",
+                        borderColor: colors['THUBlue'],
                         spanGaps: true,
                         stepped: "before",
-                    },              
-                    <ChartDatasetCustomTypesPerDataset>{
-                        type: "line",
-                        data: [],
-                        yAxisID: 'y',
-                        label: "Probe",
-                        borderColor: colors['THURed'],
-                        spanGaps: true,
-                        stepped: "before",
-                    },                                              
+                    },                                                 
                 ]
             },
             options: {
@@ -83,23 +74,23 @@ export default defineComponent({
                             }
                         },
                     },
-                    ye: {
-                        title: { display: true, text: "mg/kg/min per pmol/l" },
-                        min: 0,
-                        ticks: { stepSize: 0.005 },
-                        suggestedMax: 0.1,
-                    },
-                    ys: {
-                        title: { display: true, text: "1" },
-                        min: 0,
-                        ticks: { stepSize: 1 },
-                        suggestedMax: 3,
-                    },
-                    yu: {
+                    y: {
                         title: { display: true, text: "mg/kg/min" },
                         min: 0,
                         ticks: { stepSize: 1 },
-                        suggestedMax: 6,
+                        suggestedMax: 4,
+                    },
+                    yx: {
+                        title: { display: true, text: "mg/kg/min" },
+                        min: 0,
+                        ticks: { stepSize: 1 },
+                        suggestedMax: 4,
+                    },
+                    yk: {
+                        title: { display: true, text: "mg/kg/min per pmol/l" },
+                        min: 0,
+                        ticks: { stepSize: 0.001 },
+                        suggestedMax: 0.05,
                     },
                 },
                 
@@ -108,7 +99,7 @@ export default defineComponent({
     },
     methods: {
         reset() {
-            let datasets = chartSignals.data.datasets
+            let datasets = chartSignals1.data.datasets
             for (let i = 0; i < datasets.length; i++) {
                 datasets[i].data = []
             }
@@ -122,17 +113,16 @@ export default defineComponent({
         },
         _pushRecord(result: SimulationResult) {
             const t = result.t
-            const datasets = chartSignals.data.datasets
+            const datasets = chartSignals1.data.datasets
             
-            datasets[0].data.push({ x: t.valueOf(), y: result.y.Vmx??NaN })
-            datasets[1].data.push({ x: t.valueOf(), y: result.y.kir??NaN })
-            datasets[2].data.push({ x: t.valueOf(), y: result.y.Uid??NaN })
-            
+            datasets[0].data.push({ x: t.valueOf(), y: result.y.EGP??NaN })
+            datasets[1].data.push({ x: t.valueOf(), y: result.y.kp1??NaN })
+            datasets[2].data.push({ x: t.valueOf(), y: result.y.kp3??NaN })
             
             
         },
         update() {
-            chartSignals.update()
+            chartSignals1.update()
         },
     },
 })
@@ -142,7 +132,7 @@ export default defineComponent({
 <template>
     <AccordionBox :title="$t('title')" :initial="true">
         <div class="canvas-chart">
-            <canvas id="signals" />
+            <canvas id="signals1" />
         </div>
     </AccordionBox>
 </template>
@@ -150,11 +140,11 @@ export default defineComponent({
 
 <i18n locale="en">
 {
-	"title":		"Model Signals Uid",
+	"title":		"Model Signals EPG",
 }
 </i18n>
 <i18n locale="de">
 {
-	"title": 		"Modell Signale Uid",
+	"title": 		"Modell Signale EPG",
 }
 </i18n>
