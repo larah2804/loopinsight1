@@ -6,6 +6,7 @@
  */
 
 import { ModuleTranslationList } from './ModuleProfile.js'
+import DailyProfile from '../common/DailyProfile.js';
 
 /**
  * Interface describing a module that uses parameters.
@@ -60,7 +61,7 @@ export default interface ParametricModule {
 
 
 /** supported types of a parameter value */
-export declare type ParameterValue = number | object | boolean | string
+export declare type ParameterValue = number | object | boolean | string  | DailyProfile
 
 /** general module configuration (not specific to a certain module) */
 export declare type ParameterValues = {

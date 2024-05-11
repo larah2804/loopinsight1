@@ -125,6 +125,7 @@ export const PatientOutputDescription = {
     Vmx: {},
     kir: {},
     Uid: {},
+    kp3: {},
 }
 
 /**
@@ -140,6 +141,7 @@ export declare type PatientOutput = {
     Vmx?: number,
     kir?: number,
     Uid?: number,
+    kp3?: number,
 }
 
 /** 
