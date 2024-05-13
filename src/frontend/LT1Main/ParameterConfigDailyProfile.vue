@@ -1,5 +1,5 @@
 <script lang="ts">
-import { defineComponent, PropType } from 'vue';
+import { defineComponent, PropType, toRaw } from 'vue';
 import DailyProfile from '../../common/DailyProfile.js';
 import InfoboxTooltip from './InfoboxTooltip.vue';
 import { ParameterDescription } from '../../types/ParametricModule.js'
@@ -22,35 +22,26 @@ export default defineComponent({
     data() {
         return {
             // Initialisiert DailyProfile mit den übergebenen Standardwerten
-            editedProfile: new DailyProfile(this.defaultValue || [])
+            profileData: JSON.parse(JSON.stringify(this.defaultValue || []))
         };
     },
-    watch: {
-    defaultValue: {
-        handler: function(newVal: Array<[number, number]>) {
-            // Überprüfen, ob das neue Array anders ist als das aktuelle Profil
-            if (JSON.stringify(newVal) !== JSON.stringify(this.editedProfile.profile)) {
-                this.editedProfile.profile = newVal; // Kopie des Arrays, um reaktive Updates zu erzwingen
-                this.valueChanged();  // Emitted ein Update-Event, falls nötig
-            }
-        },
-        immediate: true,  // Führt den Handler sofort beim Initialisieren aus
-        deep: true  // Achtet auf tiefe Änderungen im Objekt/Array
-        },
-    },
+    
 
     methods: {
         addEntry() {
-            this.editedProfile.addEntry();
+            this.profileData.push([0, 0]); 
             this.valueChanged();
         },
         removeEntry(index: number) {
-            this.editedProfile.removeEntry();
+            if (index >= 0 && index < this.profileData.length) {
+                this.profileData.splice(index, 1);
+            }
             this.valueChanged();
         },
         valueChanged() {
             // Informiert die Elternkomponente über eine Änderung
-            this.$emit('valueChanged', this.editedProfile.profile);
+            const updatedProfile = new DailyProfile(this.profileData);
+            this.$emit('valueChanged', toRaw(updatedProfile));
         },
     },
     components: {
@@ -73,7 +64,7 @@ export default defineComponent({
                 </tr>
             </thead>
             <tbody>
-                <tr v-for="(entry, index) in editedProfile.profile" :key="index">
+                <tr v-for="(entry, index) in profileData" :key="index">
                     <td><input v-model.number="entry[0]" type="number" @input="valueChanged" /></td>
                     <td><input v-model.number="entry[1]" type="number" @input="valueChanged" /></td>
                 </tr>
