@@ -12,7 +12,8 @@ import {
     TypedPatientState, PatientInput, PatientOutput
 } from '../../types/Patient.js'
 import AbstractODEPatient, { createPatientFromODE } from '../AbstractODEPatient.js'
-import {Interpolation, kirBerechnung, kp1Berechnung, Klasse} from '../../frontend/util/Funktionen.js'
+import {Interpolation, kirCalculation, kp1Calculation, Class} from '../../frontend/util/Funktionen.js'
+import DailyProfile from '../../common/DailyProfile.js'
 
 export const profile: ModuleProfile = {
     type: "patient",
@@ -69,21 +70,20 @@ export class UvaPadova_T1DMS
      * This value appears in the equations (computeDerivatives), but it is
      * neither a state variable nor a parameter, but part of the steady state.
      */
+
+    //als DailyProfile anlegen
     Ib: number = NaN
     EGP: number = NaN
-    kp1: number = NaN
-    Vmx: number = NaN
-    kir: number = NaN
+    kp1: DailyProfile = new DailyProfile([])
+    Vmx: DailyProfile = new DailyProfile([])
+    kir: DailyProfile = new DailyProfile([])
     Uid: number = NaN
-    kp3: number = NaN
+    kp3: DailyProfile = new DailyProfile([])
+
 
 
     getModelInfo(): ModuleProfile {
         return profile
-    }
-    
-    updateVmx(array: any) {
-        this.Vmx = array
     }
 
     getInputList(): Array<keyof PatientInput> {
@@ -98,15 +98,66 @@ export class UvaPadova_T1DMS
         return stateDescription
     }
 
-    getTest() {
-        return 
-    }
-
     getParameterDescription() {
         return parameterDescription
     }
 
     computeSteadyState(u: PatientInput, t: Date): State {
+        const params = this.getParameterValues()
+
+        function getclass(parameter: number){
+            let supportpoint: [number, number][];
+
+            switch (params.SI) {
+            case 0: // Class with constant insulin sensivity (high)
+                params.B,params.L,params.D = 1
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter], [24,params.D*parameter]];
+                break;
+            case 1: // Class with constant insulin sensivity (low)
+                params.B,params.L,params.D = 0.75
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter], [24,params.D*parameter]];
+                break;
+            case 2: // Class with probability of occurrence of 5 %
+                params.B = 0.75
+                params.L,params.D = 1
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter], [24,params.D*parameter]];
+            case 3: // Class with porbalbility of occurrence of 5% 
+                params.B,params.L = 1
+                params.D = 0.75
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter], [24,params.D*parameter]];
+                break;
+            case 4: // Class with porbalbility of occurrence of 10% 
+                params.B,params.D = 0.75
+                params.L = 1
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter], [24,params.D*parameter]];
+                break;
+            case 5: // Class with porbalbility of occurrence of 20% 
+                params.B,params.D = 1
+                params.L = 0.75
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter], [24,params.D*parameter]];
+                break;
+            case 6: // Class with porbalbility of occurrence of 20% 
+                params.B,params.L = 0.75
+                params.D = 1
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter], [24,params.D*parameter]];
+                break;
+            case 7: // Class with highest probability of occurrence of 30%
+                params.B = 1
+                params.L,params.D = 0.75
+                supportpoint = [[0, params.D*parameter], [3, params.D*parameter], [5, params.B*parameter], [10, params.B*parameter], [12, params.L*parameter], [16, params.L*parameter], [18, params.D*parameter]];
+                break;
+            default:
+                supportpoint = [[0,0]];
+            }
+            return supportpoint
+        }
+        
+        this.Vmx = new DailyProfile(getclass(params.Vmx)) 
+        this.kp3 = new DailyProfile(getclass(params.kp3))
+        this.kp1 = new DailyProfile([[0,params.kp1],[7,params.kp1*params.alpha],[9,params.kp1]])
+        this.kir = new DailyProfile([[0,params.kir],[7,params.kir*(1.2/(0.2+params.alpha))],[9,params.kir]])
+
+
         const helper = new SteadyStateFinder()
         this.Ib = NaN
 
@@ -141,7 +192,7 @@ export class UvaPadova_T1DMS
     computeDerivatives(_t: Date, x: State, u: PatientInput): State {
 
         const params = this.getParameterValues()
-        
+                
         // inputs
         /** meal ingestion in mg/min */
         const M = (u.carbs || 0) * 1000
@@ -166,20 +217,12 @@ export class UvaPadova_T1DMS
             risk = 10 * Math.pow(f_risk(G), 2)
         }
 
-        
-        let h = _t.getHours();
-        let m = _t.getMinutes()/60
-        let t = h + m
-        //let Vmx = Interpolation(Klasse(params.SI, 0.047, params.EB, params.ZB, params.DB, params.VB),t);
-        //this.Vmx = Vmx
-        let Vmx = Interpolation([[0, 0.047], [4, 0.047], [11, 0.047], [17, 0.047]],t)
-        this.Vmx = Vmx
-        
         /** insulin-dependent glucose utilization in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A10)
-        let kir = kirBerechnung(t, params.inU, params.kir);
-        this.kir = kir
-
+        //calculation of the time-dependent parameter kir and Vmx
+        const kir = this.kir.getInterpolation(_t,1)
+        const Vmx = this.Vmx.getInterpolation(_t,2)
+        
         const Uid = (kir * (params.Vm0 + Vmx * x.X * (1 + params.rgamma * risk))
             * x.Gt) / (params.Km0 + x.Gt)
         this.Uid = Uid
@@ -198,10 +241,9 @@ export class UvaPadova_T1DMS
 
         /** endogenous glucose production in mg/kg/min */
         // [Dalla Man, JDST, 2014] (A5), [Dalla Man, IEEE TBME, 2007] (10) (Ipo = 0)
-        let kp3 = Interpolation(Klasse(params.SI, params.kp3, params.EB, params.ZB, params.DB, params.VB),t);
-        this.kp3 = kp3
-        let kp1 = kp1Berechnung(t, params.inE, params.kp1);
-        this.kp1 = kp1
+        //calculation of the time-dependent parameter kp3 and kp1
+        const kp3 = this.kp3.getInterpolation(_t,2)
+        const kp1 = this.kp1.getInterpolation(_t,1)
 
         const EGP = Math.max(0, kp1 - params.kp2 * x.Gp
             - kp3 * x.XL + params.kxi * x.XH)  
@@ -327,17 +369,20 @@ export class UvaPadova_T1DMS
         return dx_dt
     }
 
-    computeOutput(_t: Date, x: State): PatientOutput {
+    computeOutput(t: Date, x: State): PatientOutput {
         const params = this.getParameterValues()
         return {
+
+            //this.parameter.Funktion als Ausgabe
             Gp: x.Gp / params.VG,
             Gt: x.Gs / params.VG,
             EGP: this.EGP,
-            kp1: this.kp1,
-            Vmx: this.Vmx,
-            kir: this.kir,
+            kp1: this.kp1.getInterpolation(t,1),
+            Vmx: this.Vmx.getInterpolation(t,2),
+            kir: this.kir.getInterpolation(t,1),
             Uid: this.Uid,
-            kp3: this.kp3,
+            kp3: this.kp3.getInterpolation(t,2),
+            
         }
     }
 
@@ -380,7 +425,7 @@ export const parameterDescription = {
     "ki":       { unit: "1/min",     default: 0.0079,},	// [Dalla Man, IEEE TBME, 2007]
     "Fcns":     { unit: "mg/kg/min",     default: 1,     },  // [Dalla Man, IEEE TBME, 2007]
     "Vm0":      { unit: "mg/kg/min",     default: 2.5,	},  // [Dalla Man, IEEE TBME, 2007]
-    "Vmx":      { unit: "mg/kg/min per pmol/l",     default: [[0, 0.047], [4, 0.047], [11, 0.047], [17, 0.047]],	},	// [Dalla Man, IEEE TBME, 2007]
+    "Vmx":      { unit: "mg/kg/min per pmol/l",     default: 0.047,	},	// [Dalla Man, IEEE TBME, 2007]
     "Km0":      { unit: "mg/kg",     default: 225.59,},	// [Dalla Man, IEEE TBME, 2007]
     "p2u":      { unit: "1/min",     default: 0.0331,},	// [Dalla Man, IEEE TBME, 2007]
     "ke1":      { unit: "1/min",     default: 0.0005,},	// [Dalla Man, IEEE TBME, 2007]
@@ -388,15 +433,14 @@ export const parameterDescription = {
     "ka1":      { unit: "1/min",     default: 0.0018,},	// [Dalla Man, JDST, 2007]
     "ka2":      { unit: "1/min",     default: 0.0182,},	// [Dalla Man, JDST, 2007]
     "kd":       { unit: "1/min",     default: 0.0164,},	// [Dalla Man, JDST, 2007]
-    "Td":       { unit: "min",     default: 10,	},	// [Dalla Man, JDST, 2007]
-    "SI":       { unit: "1",      default: 7,}, // Insulinsensivität(Klasse 0-7)
-    "inE":      { unit: "1",      default: 1.5,}, // EPG Steigung während 3.00 und 7.00
-    "kir":      { unit: "1",      default: 1,}, 
-    "inU":      { unit: "1",      default: 0.19,}, // EPG Senkung während 3.00 und 7.00
-    "EB":       { unit: "1",     default: 0,},
-    "ZB":       { unit: "1",     default: 0,},
-    "DB":       { unit: "1",     default: 0,},
-    "VB":       { unit: "1",     default: 0,},
+    "Td":       { unit: "min",     default: 10,	},	// [Dalla Man, JDST, 2007] 
+    "SI":       { unit: "1",      default: 5,}, // Insulin sensitivity (class 0-7) [Perriello G, Dawn phenomenon, 1991]
+    "alpha":    { unit: "1",      default: 1,}, // EPG increase during 3.00 am und 7.00 am [Visentin et al, 2018]
+    "kir":      { unit: "1",      default: 1,}, // new parameter [Visentin et al, 2018]
+    "B":        { unit: "",       default: 1,}, // Breakfeast influence on insulin sensitivity
+    "L":        { unit: "",       default: 1,}, // Lunch influence on insulin sensitivity
+    "D":        { unit: "",       default: 1,}, // Dinner influence on insulin sensitivity
+
     /** 
      * parameter for alpha-cell responsivity to glucose level
      * TODO: find reliable value in the literature
