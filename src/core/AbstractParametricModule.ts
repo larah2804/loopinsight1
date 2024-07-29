@@ -5,6 +5,7 @@
  * See https://lt1.org for further information.
  */
 
+import DailyProfile from '../common/DailyProfile.js'
 import ParametricModule,
 {
     ParameterDescriptions,
@@ -85,10 +86,24 @@ export default abstract class AbstractParametricModule
             return
         }
         // only use parameters that are part of the list
+        console.log(newValues)
         for (const paramName in newValues) {
+            if (paramName == 'Vmx') {
+                console.log(paramName)
+                console.log(typeof paramName)
+                console.log(newValues[paramName]); // Gibt den Wert des Parameters aus
+                console.log(typeof newValues[paramName]); // Gibt den Typ des Werts des Parameters aus
+
+            }
+
+
             if (paramName in this._parameters) {
                 const id: keyof TypedParameterValues<Parameters, CommonParameters> = paramName
                 // TODO deeply merge objects (if applicable)
+                if (newValues instanceof DailyProfile ) {
+                    console.log('GUT')
+
+                }
                 if (typeof newValues[paramName] === typeof this._parameters[id]) {
                     // TODO: avoid "any"?
                     // We cannot know exactly what the parameter value is
@@ -97,6 +112,10 @@ export default abstract class AbstractParametricModule
                 }
                 else {
                     console.warn(`value of parameter ${paramName} has wrong type.`)
+                    console.log(paramName)
+                    console.log(typeof paramName)
+                    console.log(newValues[paramName]); // Gibt den Wert des Parameters aus
+                    console.log(typeof newValues[paramName]); // Gibt den Typ des Werts des Parameters aus
                 }
             }
             else {
@@ -148,8 +167,7 @@ function getDefaultParameterValuesRecursive(config: ParameterDescriptions)
         Object.keys(config).map(function (p) {
             const defaultValue = config[p]?.default
             if (typeof defaultValue === "object" &&
-                Object.keys(defaultValue ?? {}).length > 0 &&
-                !Array.isArray(defaultValue)) {
+                Object.values(defaultValue).filter( (entry) => typeof entry?.default !== "undefined" ).length > 0) {
                 // parameter p is of type object, call this function recursively
                 return [p, getDefaultParameterValuesRecursive(
                     <ParameterDescriptions>config[p].default)]
@@ -161,7 +179,7 @@ function getDefaultParameterValuesRecursive(config: ParameterDescriptions)
                 return []
             }
             else {
-                // parameter p is numeric
+                // parameter p is numeric, Date, or another type
                 return [p, config[p].default]
             }
         }).filter(
