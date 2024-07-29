@@ -12,7 +12,6 @@ import {
     TypedPatientState, PatientInput, PatientOutput
 } from '../../types/Patient.js'
 import AbstractODEPatient, { createPatientFromODE } from '../AbstractODEPatient.js'
-import {Interpolation, kirCalculation, kp1Calculation, Class} from '../../frontend/util/Funktionen.js'
 import DailyProfile from '../../common/DailyProfile.js'
 
 export const profile: ModuleProfile = {
