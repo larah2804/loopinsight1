@@ -98,7 +98,9 @@ export default defineComponent({
 
         async loadModel(id: string, parameters: Object = {}) {
             console.log("load module "+id)
+            console.log(parameters)
             const moduleImport = this.modelImports?.[id]
+            console.log(moduleImport)
             if (typeof moduleImport === "undefined") {
                 console.warn("Model \"" + id + "\" unknown.")
                 return
@@ -152,6 +154,7 @@ export default defineComponent({
                 if (oldParams !== newParams) {
                     this.$emit("valueChanged", <ParametricModule>this.getModule())
                 }
+                console.log(newParameterValues)
             }
         },
 

@@ -71,12 +71,10 @@ export default defineComponent({
         ChartInsulinCarbs,
         ChartControllerOutput,
         ChartAGP,
-        ChartSignals,
-        ChartSignals1,
-        Test,
-        S,
-        Vmx,
-        UvaPadova_T1DMS,
+        ChartSignals, // Vmx, kir and Uid
+        ChartSignals1, // kp3, kp1 and EPG
+        
+        
     },
 
     data() {
@@ -92,14 +90,6 @@ export default defineComponent({
             myCharts: [],
             daten: [],
             UvaPadova_T1DMS: new UvaPadova_T1DMS(),
-            parameterDescription: {
-            // Initialisieren Sie es mit dem tatsächlichen Objekt, das die Parameter beschreibt
-            Gpeq: { unit: "mg/dl", default: 100, step: 10 },
-            BW: { unit: "kg", default: 75, step: 5 },
-            // weitere Parameter...
-            Vmx: { unit: "mg/kg/min per pmol/l", default: [[0, 0.047], [4, 0.047], [11, 0.047], [17, 0.047]] },
-            // weitere Parameter...
-        }
         }
     },
 
@@ -159,18 +149,13 @@ export default defineComponent({
         patientChanged(newPatient: Patient): void {
             if (typeof newPatient !== "undefined") {
                 console.log("Patient changed")
+                console.log(newPatient)
                 this.patient = newPatient
                 const profile = newPatient?.getPatientProfile?.()
                 if (typeof profile !== "undefined") {
                     this.patientProfile = profile
                 }
             }
-        },
-        profileUpdated(parameterValues: any): void {
-            if (typeof parameterValues !== "undefined") {
-                this.parameterDescription.Vmx = parameterValues 
-            }
-            this.UvaPadova_T1DMS.updateVmx(parameterValues);
         },
         sensorChanged(newSensor: Sensor): void {
             if (typeof newSensor !== "undefined") {
@@ -230,7 +215,7 @@ export default defineComponent({
             <SensorSelection @valueChanged="sensorChanged" />
             <ActuatorSelection @valueChanged="actuatorChanged" />
             <VirtualPatientSelection @patientChanged="patientChanged" />
-            <Test @profileUpdated="profileUpdated" @datasaved="updateData" />
+            <Test @datasaved="updateData" />
             <MealTable v-if='options.t0' :t0="options.t0" @mealsChanged="mealsChanged" ref="meals" />
             <ExerciseTable v-if='options.t0' :t0="options.t0" @exercisesChanged="exercisesChanged" />
             <SimulationOptionsConfig @valueChanged="optionsChanged" ref="options" />

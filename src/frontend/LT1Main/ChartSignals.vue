@@ -57,16 +57,7 @@ export default defineComponent({
                         borderColor: colors['THURed'],
                         spanGaps: true,
                         stepped: "before",
-                    },              
-                    <ChartDatasetCustomTypesPerDataset>{
-                        type: "line",
-                        data: [],
-                        yAxisID: 'y',
-                        label: "Probe",
-                        borderColor: colors['THURed'],
-                        spanGaps: true,
-                        stepped: "before",
-                    },                                              
+                    },                                                          
                 ]
             },
             options: {

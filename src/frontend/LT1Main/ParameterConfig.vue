@@ -57,6 +57,7 @@ export default defineComponent({
         },
 
         valueChanged(args: Object) {
+            console.log(args)
             this.$emit("valueChanged", args)
         }
     },
